@@ -951,6 +951,7 @@ export default function AdminDashboard() {
       {reprintVoucherPayload && (
         <div id="thermal-voucher-zone" className="bg-white text-black p-4">
           <div className="text-center mb-4 border-b border-black pb-2">
+            <img src="/glitoslogo.svg" alt="Glitos Logo" className="w-12 h-12 mx-auto mb-2 grayscale opacity-90" />
             <h2 className="text-xl font-bold font-mono">G POS (REPRINT)</h2>
             <p className="text-xs">Receipt #{reprintVoucherPayload.txnHash}</p>
             <p className="text-xs">Original Time: {new Date(reprintVoucherPayload.ledgerTimestamp).toLocaleString()}</p>
