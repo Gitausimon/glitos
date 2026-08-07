@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, User, Gift, Star } from 'lucide-react';
+import { Search, User, Gift, Star } from 'lucide-react';
 import { BreakfastIcon, ChickenIcon, ChipsIcon, DrinksIcon, PackagingIcon } from '../components/CategoryIcons';
 
 export default function SuperAppHome() {
