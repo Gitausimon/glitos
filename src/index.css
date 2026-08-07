@@ -1,14 +1,18 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
 
 @theme {
-  --color-brand-primary: #FFC245;
-  --color-brand-secondary: #689482;
+  --color-brand-primary: #FFC533;
+  --color-brand-secondary: #00A082;
+  --color-brand-green-light: #8EC042;
   --color-brand-accent: #E1B648;
-  --color-brand-background: #FAFAFA;
+  --color-brand-background: #FFFDF8;
   --color-brand-surface: #FFFFFF;
-  --color-brand-text: #111827;
+  --color-brand-text: #222222;
   --color-brand-muted: #6B7280;
 }
+
 
 @utility squircle-g2 {
   border-radius: 24px;
@@ -26,13 +30,29 @@
   scrollbar-width: none;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--color-brand-background);
   color: var(--color-brand-text);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Poppins', system-ui, sans-serif;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Global focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-brand-secondary);
+  outline-offset: 2px;
+}
+
+/* Smooth transitions for interactive elements */
+button, a, input, select {
+  transition: all 0.2s ease;
 }
 
 @media print {

@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { CreditCard, Banknote, Search, Minus, Plus, Trash2, ConciergeBell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInventory, type PosInventoryItem } from '../context/InventoryContext';
+import { useOrders } from '../context/OrderContext';
+import { useAuth } from '../context/AuthContext';
+import { LogOut } from 'lucide-react';
 
 type ActiveCartEntry = PosInventoryItem & {
   sessionQuantity: number;
@@ -9,6 +12,8 @@ type ActiveCartEntry = PosInventoryItem & {
 
 export default function PosTerminal() {
   const { inventoryCorpus } = useInventory();
+  const { addOrder } = useOrders();
+  const { currentUser, logout } = useAuth();
   const [activeCheckoutSession, setActiveCheckoutSession] = useState<ActiveCartEntry[]>([]);
   const [lexicalSearchQuery, setLexicalSearchQuery] = useState('');
   const [isMobileCartExpanded, setIsMobileCartExpanded] = useState(false);
@@ -52,16 +57,38 @@ export default function PosTerminal() {
     0
   );
 
-  const dispatchFinancialTransaction = (tenderType: 'CASH' | 'MPESA') => {
-    // Generate isolated payload for voucher rendering
+  const dispatchFinancialTransaction = async (tenderType: 'CASH' | 'MPESA') => {
+    const currentTxnHash = Math.floor(Date.now() / 1000).toString().slice(-6);
+    
+    // 1. Sync to Firebase Backend
+    try {
+      await addOrder({
+        txnHash: `TXN-${currentTxnHash}`,
+        ledgerTimestamp: new Date().toISOString(),
+        financialMagnitude: terminalLedgerTotal,
+        actionTypology: `TENDER_${tenderType}`,
+        actorIdentity: currentUser?.email?.split('@')[0] || 'Cashier',
+        items: activeCheckoutSession.map(item => ({
+          inventoryIdentifier: item.inventoryIdentifier,
+          culinaryNomenclature: item.culinaryNomenclature,
+          retailValuation: item.retailValuation,
+          sessionQuantity: item.sessionQuantity
+        }))
+      });
+    } catch (e) {
+      console.error(e);
+      alert("System Offline: Transaction log failed to sync.");
+      return; 
+    }
+
+    // 2. Generate isolated payload for voucher rendering
     setTerminalVoucherPayload([...activeCheckoutSession]);
     setVoucherAuditContext({ tenderType, totalValue: terminalLedgerTotal });
 
-    // Allow React tree to inject the voucher zone before triggering browser thermal spooler
+    // 3. Print & Cleanup
     setTimeout(() => {
       window.print();
       
-      // Cleanup state post-transaction
       setActiveCheckoutSession([]);
       setTerminalVoucherPayload(null);
       setIsMobileCartExpanded(false);
@@ -78,12 +105,23 @@ export default function PosTerminal() {
       <main className="flex-1 flex flex-col p-4 lg:p-6 lg:pr-4 overflow-hidden relative">
         {/* Top Branding / Search Orbit */}
         <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">G POS</h1>
-            <p className="text-brand-muted text-sm mt-1">Operational Shift: Morning</p>
+          <div className="flex items-start gap-4">
+            <img src="/glitoslogo.svg" alt="Glitos Logo" className="h-14 w-auto pt-1" />
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">G POS</h1>
+              <div className="flex items-center gap-3 mt-1">
+                <p className="text-brand-muted text-sm font-medium">Logged in as <strong className="text-brand-text font-bold">{currentUser?.email}</strong></p>
+                <span className="w-1 h-1 bg-gray-300 rounded-full hidden md:block"></span>
+                <button onClick={logout} className="text-brand-secondary text-sm font-bold flex items-center gap-1 hover:opacity-80 transition-opacity">
+                  <LogOut className="w-3 h-3" /> Logout
+                </button>
+              </div>
+            </div>
           </div>
           
-          <div className="relative w-full md:w-96 shrink-0">
+          <div className="flex items-center gap-4">
+
+            <div className="relative w-full md:w-80 shrink-0">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-muted h-5 w-5" />
             <input 
               type="text" 
@@ -93,7 +131,8 @@ export default function PosTerminal() {
               className="w-full pl-12 pr-4 py-3 bg-brand-surface border border-gray-200 squircle-g2 outline-none focus:border-brand-secondary focus:ring-2 focus:ring-brand-secondary/20 transition-all font-medium"
             />
           </div>
-        </header>
+        </div>
+      </header>
 
         {/* Bespoke Grid Display using G2 Squircles */}
         <section className="flex-1 overflow-y-auto no-scrollbar pb-32 lg:pb-10">
@@ -108,7 +147,7 @@ export default function PosTerminal() {
                   whileTap={{ scale: 0.95 }}
                   key={catalogItem.inventoryIdentifier}
                   onClick={() => appendToCheckoutSession(catalogItem)}
-                  className="bg-brand-surface border border-gray-100 p-4 lg:p-6 squircle-g2 flex flex-col items-center justify-center gap-4 hover:shadow-xl hover:border-brand-primary transition-all group relative overflow-hidden"
+                  className="bg-brand-surface border-2 border-gray-100 p-4 lg:p-6 squircle-g2 flex flex-col items-center justify-center gap-4 hover:shadow-xl hover:border-brand-primary hover:shadow-brand-primary/10 transition-all group relative overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-brand-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                   
@@ -174,8 +213,8 @@ export default function PosTerminal() {
                 animate={{ opacity: 1 }} 
                 className="h-full flex flex-col items-center justify-center text-brand-muted py-20"
               >
-                <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-4 border border-gray-100">
-                  <ConciergeBell className="w-6 h-6 text-gray-400" />
+                <div className="w-16 h-16 rounded-full bg-brand-secondary/10 flex items-center justify-center mb-4 border border-brand-secondary/20">
+                  <ConciergeBell className="w-6 h-6 text-brand-secondary" />
                 </div>
                 <p>Cart is empty.</p>
                 <p className="text-sm mt-1">Add items to start.</p>
@@ -230,7 +269,7 @@ export default function PosTerminal() {
             <button
               disabled={activeCheckoutSession.length === 0}
               onClick={() => dispatchFinancialTransaction('CASH')}
-              className="flex flex-col items-center justify-center p-3 lg:p-4 bg-brand-surface border-2 border-transparent hover:border-brand-primary text-brand-text squircle-g2 shadow-sm disabled:opacity-50 disabled:hover:border-transparent transition-all group"
+              className="flex flex-col items-center justify-center p-3 lg:p-4 bg-brand-surface border-2 border-gray-100 hover:border-brand-primary hover:shadow-brand-primary/20 hover:shadow-lg text-brand-text squircle-g2 shadow-sm disabled:opacity-50 disabled:hover:border-transparent transition-all group"
             >
               <Banknote className="w-6 h-6 lg:w-8 lg:h-8 mb-1 lg:mb-2 text-brand-secondary group-hover:scale-110 transition-transform" />
               <span className="font-bold text-sm lg:text-base">Cash</span>

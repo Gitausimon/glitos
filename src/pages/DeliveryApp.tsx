@@ -2,56 +2,18 @@ import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInventory, type PosInventoryItem } from '../context/InventoryContext';
 import { useStoreSettings } from '../context/StoreContext';
-import { MapPin, ChevronLeft, Phone, CheckCircle2, Plus, Minus, Search, ChevronRight } from 'lucide-react';
-
+import { MapPin, ChevronLeft, CheckCircle2, Plus, Minus, Search, ChevronRight, ShoppingBag, AlertTriangle, LogIn } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 type CartItem = PosInventoryItem & { quantity: number };
-type CheckoutPhase = 'HIDDEN' | 'CART' | 'LOCATION_FORM' | 'MPESA_PAYMENT' | 'SUCCESS';
+type CheckoutPhase = 'HIDDEN' | 'CART' | 'AUTH' | 'LOCATION_FORM' | 'MPESA_PAYMENT' | 'SUCCESS';
 
-const FoodOrbit = () => {
-  const { settings } = useStoreSettings();
-  const orbitItems = settings.orbitItems;
-  
-  return (
-    <div className="relative w-full h-72 lg:h-96 overflow-hidden bg-brand-surface squircle-g2 flex items-center justify-center mb-6 shadow-sm border border-gray-100">
-      <div className="text-center z-10 w-72 backdrop-blur-md bg-white/20 p-6 squircle-g2 shadow-sm border border-white/50">
-        <h1 className="font-extrabold text-4xl text-brand-primary drop-shadow-md">{settings.heroTitle}</h1>
-        <p className="font-bold text-sm text-gray-700 mt-2">{settings.heroSubtitle}</p>
-      </div>
-      
-      {/* Outer Orbit Path */}
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-        className="absolute w-[22rem] h-[22rem] lg:w-[32rem] lg:h-[32rem] rounded-full border-[3px] border-dashed border-gray-200/50 flex items-center justify-center pointer-events-none"
-      >
-        {orbitItems.map((img, i) => {
-          const angle = (i * 360) / orbitItems.length;
-          // Desktop radius vs Mobile radius translation handling via CSS variables or fixed offsets
-          return (
-            <div 
-              key={i} 
-              className="absolute w-24 h-24 lg:w-32 lg:h-32 flex justify-center items-center"
-              style={{ transform: `rotate(${angle}deg) translate(clamp(11rem, 20vw, 16rem)) rotate(-${angle}deg)` }}
-            >
-              {/* Ferris wheel counter-rotation to keep images upright */}
-              <motion.img 
-                src={img} 
-                animate={{ rotate: -360 }} 
-                transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-                className="w-full h-full object-contain filter drop-shadow-2xl" 
-              />
-            </div>
-          );
-        })}
-      </motion.div>
-    </div>
-  );
-};
+import CategoryBubbles from '../components/CategoryBubbles';
 
 
 export default function DeliveryApp() {
   const { inventoryCorpus } = useInventory();
   const { settings } = useStoreSettings();
+  const { currentUser, signInWithGoogle, logout } = useAuth();
   
   // States
   const [activeCategory, setActiveCategory] = useState<string>('All');
@@ -89,16 +51,15 @@ export default function DeliveryApp() {
     return inventoryCorpus
       .filter(item => item.isAvailableForDelivery !== false)
       .map(item => {
-        let category = 'Others';
+        let category = 'Breakfast & Snacks'; // Default
         const name = (item.culinaryNomenclature || '').toLowerCase();
-        if (name.includes('chicken') || name.includes('combo')) category = 'Mains';
-        if (name.includes('chips') || name.includes('fries') || name.includes('potato')) category = 'Sides';
-        if (name.includes('soda') || name.includes('drink') || name.includes('water')) category = 'Drinks';
+        if (name.includes('chicken') || name.includes('combo') || name.includes('burger')) category = 'Chicken';
+        if (name.includes('chips') || name.includes('fries') || name.includes('potato')) category = 'Chips & Sides';
+        if (name.includes('soda') || name.includes('drink') || name.includes('water') || name.includes('coke')) category = 'Drinks';
+        if (name.includes('bag') || name.includes('package') || name.includes('box')) category = 'Packaging';
         return { ...item, category, currentPrice: item.deliveryValuation ?? item.retailValuation };
       });
   }, [inventoryCorpus]);
-
-  const categories = ['All', 'Mains', 'Sides', 'Drinks'];
 
   const filteredMenu = categorizedMenu.filter(item => {
     const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
@@ -140,6 +101,43 @@ export default function DeliveryApp() {
   }, [cartCorpus, categorizedMenu]);
 
 
+  // Checkout progress indicator
+  const CheckoutStepper = ({ phase }: { phase: CheckoutPhase }) => {
+    const steps = [
+      { key: 'CART', label: 'Cart' },
+      { key: 'AUTH', label: 'Account' },
+      { key: 'LOCATION_FORM', label: 'Location' },
+      { key: 'MPESA_PAYMENT', label: 'Payment' },
+      { key: 'SUCCESS', label: 'Done' },
+    ];
+    const currentIndex = steps.findIndex(s => s.key === phase);
+    
+    if (phase === 'HIDDEN' || (phase === 'CART' && cartCorpus.length === 0)) return null;
+
+    return (
+      <div className="flex items-center justify-between px-6 py-3 bg-gray-50/80 border-b border-gray-100">
+        {steps.map((step, i) => (
+          <div key={step.key} className="flex items-center flex-1 last:flex-none">
+            <div className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold shrink-0 transition-colors ${
+              i <= currentIndex ? 'bg-brand-secondary text-white' : 'bg-gray-200 text-gray-500'
+            }`}>
+              {i < currentIndex ? '✓' : i + 1}
+            </div>
+            <span className={`text-[10px] font-semibold ml-1.5 hidden sm:inline ${
+              i <= currentIndex ? 'text-brand-secondary' : 'text-gray-400'
+            }`}>{step.label}</span>
+            {i < steps.length - 1 && (
+              <div className={`flex-1 h-0.5 mx-2 rounded-full transition-colors ${
+                i < currentIndex ? 'bg-brand-secondary' : 'bg-gray-200'
+              }`} />
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+
   // Shared UI logic for the Checkout forms mapped directly for both Desktop Sidebar and Mobile Bottom Sheet
   const renderCheckoutFlow = (phase: CheckoutPhase) => {
     return (
@@ -149,8 +147,12 @@ export default function DeliveryApp() {
             <motion.div key="cart" initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} className="p-5">
               
               {cartCorpus.length === 0 ? (
-                <div className="text-center py-20 text-gray-400 font-bold border-2 border-dashed border-gray-100 rounded-3xl">
-                  Basket is empty.
+                <div className="text-center py-16 text-gray-400 border-2 border-dashed border-gray-100 rounded-3xl flex flex-col items-center gap-3">
+                  <div className="w-16 h-16 rounded-full bg-brand-secondary/10 flex items-center justify-center">
+                    <ShoppingBag className="w-7 h-7 text-brand-secondary" />
+                  </div>
+                  <p className="font-bold text-gray-500">Your basket is empty</p>
+                  <p className="text-sm text-gray-400">Browse our menu and add items to get started</p>
                 </div>
               ) : (
                 <div className="space-y-4 mb-8">
@@ -204,6 +206,32 @@ export default function DeliveryApp() {
             </motion.div>
           )}
 
+          {phase === 'AUTH' && (
+            <motion.div key="auth" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} className="p-8 flex flex-col items-center justify-center h-full gap-6 text-center mt-10">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100">
+                <LogIn className="w-8 h-8 text-blue-500" />
+              </div>
+              <div>
+                <h3 className="font-black text-2xl tracking-tight mb-2">Create an Account</h3>
+                <p className="text-gray-500 text-sm font-medium leading-relaxed">Sign in with Google to save your delivery addresses and track past orders easily.</p>
+              </div>
+              <button 
+                onClick={async () => {
+                  try {
+                    await signInWithGoogle();
+                    setCheckoutPhase('LOCATION_FORM');
+                  } catch (e) {
+                    alert("Failed to sign in. Please try again.");
+                  }
+                }}
+                className="w-full sm:w-auto bg-white border-2 border-gray-200 px-6 py-4 squircle-g2 flex items-center justify-center gap-3 font-bold hover:bg-gray-50 active:scale-95 transition-all shadow-sm"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+                Continue with Google
+              </button>
+            </motion.div>
+          )}
+
           {phase === 'LOCATION_FORM' && (
             <motion.div key="location" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }} className="p-6 space-y-5">
               
@@ -227,19 +255,19 @@ export default function DeliveryApp() {
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Full Name</label>
-                <input type="text" value={deliveryDetails.name} onChange={e => setDeliveryDetails({...deliveryDetails, name: e.target.value})} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-text font-medium" placeholder="E.g., John Doe" />
+                <input type="text" value={deliveryDetails.name} onChange={e => setDeliveryDetails({...deliveryDetails, name: e.target.value})} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-secondary font-medium" placeholder="E.g., John Doe" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Delivery Phone</label>
-                <input type="number" value={deliveryDetails.phone} onChange={e => setDeliveryDetails({...deliveryDetails, phone: e.target.value})} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-text font-medium" placeholder="07XX XXX XXX" />
+                <input type="number" value={deliveryDetails.phone} onChange={e => setDeliveryDetails({...deliveryDetails, phone: e.target.value})} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-secondary font-medium" placeholder="07XX XXX XXX" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Building / Apartment</label>
-                <input type="text" value={deliveryDetails.building} onChange={e => setDeliveryDetails({...deliveryDetails, building: e.target.value})} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-text font-medium" placeholder="E.g., Global Trade Center" />
+                <input type="text" value={deliveryDetails.building} onChange={e => setDeliveryDetails({...deliveryDetails, building: e.target.value})} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-secondary font-medium" placeholder="E.g., Global Trade Center" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">Floor / Unit</label>
-                <input type="text" value={deliveryDetails.floor} onChange={e => setDeliveryDetails({...deliveryDetails, floor: e.target.value})} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-text font-medium" placeholder="E.g., 4th Floor, Room 402" />
+                <input type="text" value={deliveryDetails.floor} onChange={e => setDeliveryDetails({...deliveryDetails, floor: e.target.value})} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand-secondary font-medium" placeholder="E.g., 4th Floor, Room 402" />
               </div>
             </motion.div>
           )}
@@ -263,9 +291,29 @@ export default function DeliveryApp() {
 
           {phase === 'SUCCESS' && (
             <motion.div key="success" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="p-10 flex flex-col justify-center items-center h-full text-center mt-10">
-              <CheckCircle2 className="w-24 h-24 text-green-500 mb-6 drop-shadow-md" />
+              <motion.div 
+                initial={{ scale: 0 }} 
+                animate={{ scale: 1 }} 
+                transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+              >
+                <CheckCircle2 className="w-24 h-24 text-brand-secondary mb-6 drop-shadow-md" />
+              </motion.div>
               <h2 className="text-3xl font-black mb-2 tracking-tight">Order Received!</h2>
               <p className="text-gray-500 font-medium leading-relaxed">Our culinary team is preparing your meal.<br/>Expect delivery to <strong>{deliveryDetails.building}</strong>.</p>
+              
+              {/* Celebration dots */}
+              <div className="flex gap-2 mt-6">
+                {[0, 1, 2, 3, 4].map(i => (
+                  <motion.div 
+                    key={i}
+                    initial={{ y: 0, opacity: 0 }}
+                    animate={{ y: [-10, 0], opacity: 1 }}
+                    transition={{ duration: 0.4, delay: 0.5 + i * 0.1, repeat: 2, repeatType: "reverse" }}
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: ['#FFC244', '#00A082', '#8EC042', '#FFC244', '#00A082'][i] }}
+                  />
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -277,18 +325,24 @@ export default function DeliveryApp() {
     if (cartCorpus.length === 0 && phase === 'CART') return null;
 
     return (
-      <div className={`absolute inset-x-0 bottom-0 p-5 bg-white border-t border-gray-100 z-10 pt-4 ${isDesktop ? 'pb-5' : 'pb-8'} shadow-[0_-10px_20px_rgba(0,0,0,0.03)]`}>
+      <div className={`absolute inset-x-0 bottom-0 p-5 bg-brand-surface border-t border-gray-100 z-10 pt-4 ${isDesktop ? 'pb-5' : 'pb-8'} shadow-[0_-10px_20px_rgba(0,0,0,0.03)] transition-colors`}>
           {phase === 'CART' && (
             <button 
               disabled={!settings.isStoreOpen}
-              onClick={() => setCheckoutPhase('LOCATION_FORM')} 
+              onClick={() => {
+                if (currentUser) {
+                  setCheckoutPhase('LOCATION_FORM');
+                } else {
+                  setCheckoutPhase('AUTH');
+                }
+              }} 
               className="w-full bg-brand-text text-white py-4 rounded-full font-bold shadow-xl active:scale-95 transition-transform flex justify-center items-center gap-2 disabled:opacity-50 disabled:bg-gray-400"
             >
               {settings.isStoreOpen ? <><>Setup Delivery</> <ChevronRight className="w-5 h-5"/></> : 'Store is Closed'}
             </button>
           )}
           {phase === 'LOCATION_FORM' && (
-            <button disabled={!deliveryDetails.name || !deliveryDetails.building || !deliveryDetails.phone} onClick={() => setCheckoutPhase('MPESA_PAYMENT')} className="w-full bg-brand-primary text-brand-text py-4 rounded-full font-bold shadow-xl active:scale-95 transition-transform disabled:opacity-50 flex justify-center items-center gap-2">
+            <button disabled={!deliveryDetails.name || !deliveryDetails.building || !deliveryDetails.phone} onClick={() => setCheckoutPhase('MPESA_PAYMENT')} className="w-full bg-brand-secondary text-white py-4 rounded-full font-bold shadow-xl active:scale-95 transition-transform disabled:opacity-50 flex justify-center items-center gap-2">
               Proceed to Payment <ChevronRight className="w-5 h-5"/>
             </button>
           )}
@@ -316,27 +370,51 @@ export default function DeliveryApp() {
   };
 
   return (
-    <div className="relative h-[100dvh] w-full bg-[#f8f9fa] text-brand-text flex justify-center overflow-hidden">
+    <div className="relative h-[100dvh] w-full bg-brand-background text-brand-text flex justify-center overflow-hidden transition-colors">
       
       {/* Root Layout Wrap - Expands to max-width on large screens */}
-      <div className="w-full max-w-7xl h-full relative flex flex-col lg:flex-row overflow-hidden bg-white lg:bg-transparent">
+      <div className="w-full max-w-7xl h-full relative flex flex-col lg:flex-row overflow-hidden bg-brand-surface lg:bg-transparent lg:dark:bg-transparent transition-colors">
         
         {/* LEFT COLUMN: Main App & Navigation */}
-        <div className="flex-1 h-full flex flex-col bg-white lg:shadow-xl lg:mr-4 lg:rounded-r-3xl overflow-hidden relative z-10">
+        <div className="flex-1 h-full flex flex-col bg-brand-surface lg:shadow-xl lg:mr-4 lg:rounded-r-3xl overflow-hidden relative z-10 transition-colors">
           
-          <header className="px-5 lg:px-10 pt-6 pb-4 bg-white z-10">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <p className="text-xs font-bold text-brand-secondary tracking-widest uppercase mb-1">Delivering to</p>
+          {/* Store Closed Banner */}
+          <AnimatePresence>
+            {!settings.isStoreOpen && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }} 
+                animate={{ height: 'auto', opacity: 1 }} 
+                exit={{ height: 0, opacity: 0 }}
+                className="bg-red-500 text-white px-5 py-3 flex items-center justify-center gap-2 overflow-hidden"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span className="font-bold text-sm">We're currently closed — browse the menu, ordering opens soon!</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <header className="px-5 lg:px-10 pt-6 pb-2 bg-[#FFC533] z-10 transition-colors">
+            <div className="flex justify-between items-start sm:items-center mb-6 gap-2">
+              <div className="flex flex-col gap-2">
+                <img src="/glitoslogo.svg" alt="Glitos Logo" className="h-10 sm:h-12 w-auto" />
                 <div className="flex items-center gap-1 cursor-pointer">
-                  <h2 className="font-extrabold text-lg flex items-center gap-1 truncate">
-                    <MapPin className="fill-brand-primary w-5 h-5 border-2 border-white rounded-full shadow-sm" />
-                    Your Location
+                  <p className="text-[10px] font-bold text-brand-secondary tracking-widest uppercase">Delivering to</p>
+                  <h2 className="font-extrabold text-sm sm:text-lg flex items-center gap-1 truncate text-brand-text">
+                    <MapPin className="fill-brand-surface text-[#FFC533] w-4 h-4 sm:w-5 sm:h-5 rounded-full shadow-sm" />
+                    {currentUser ? 'Your Location' : 'Select Location'}
                   </h2>
                 </div>
               </div>
-              <div className="w-10 h-10 rounded-full bg-brand-primary p-2 flex items-center justify-center font-bold text-white shadow-md">
-                G
+              <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                {currentUser ? (
+                  <button onClick={logout} className="h-10 px-4 rounded-full bg-gray-100/80 hover:bg-red-50 hover:text-red-600 font-bold text-gray-700 shadow-sm text-xs transition-colors flex items-center">
+                    Logout
+                  </button>
+                ) : (
+                  <button onClick={() => setCheckoutPhase('AUTH')} className="h-10 px-4 rounded-full bg-brand-secondary text-white font-bold shadow-md text-xs hover:bg-opacity-90 transition-all flex items-center">
+                    Log In
+                  </button>
+                )}
               </div>
             </div>
             
@@ -344,31 +422,20 @@ export default function DeliveryApp() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input 
                 type="text" 
-                placeholder="What are you craving?" 
+                placeholder="What can we get you?" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border-none rounded-full outline-none focus:ring-2 focus:ring-brand-primary/40 font-medium transition-all"
+                className="w-full pl-12 pr-4 py-3.5 bg-brand-background border-none rounded-full outline-none focus:ring-2 focus:ring-brand-secondary/40 font-medium transition-all"
               />
             </div>
           </header>
 
           <main className="flex-1 overflow-y-auto no-scrollbar pb-32 lg:pb-10 px-5 lg:px-10">
             
-            <FoodOrbit />
-
-            <section className="sticky top-0 bg-white/90 backdrop-blur-md z-20 py-2 -mx-5 px-5 lg:-mx-10 lg:px-10">
-              <div className="flex gap-3 overflow-x-auto no-scrollbar py-2">
-                {categories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={`px-6 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all shadow-sm ${activeCategory === cat ? 'bg-brand-text text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </section>
+            <CategoryBubbles 
+              activeCategory={activeCategory} 
+              onSelectCategory={(cat) => setActiveCategory(cat.replace('\n', ' '))} 
+            />
 
             <section className="mt-8 pb-10">
               <h3 className="font-black text-2xl mb-6 tracking-tight">Our Menu</h3>
@@ -378,11 +445,12 @@ export default function DeliveryApp() {
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
                     key={product.inventoryIdentifier} 
-                    className="flex flex-col sm:flex-row gap-4 items-center sm:items-stretch p-4 rounded-3xl bg-white border border-gray-100 shadow-sm hover:border-brand-primary/30 hover:shadow-lg transition-all group"
+                    className="flex flex-col sm:flex-row gap-4 items-center sm:items-stretch p-4 rounded-3xl bg-brand-surface border border-gray-100 shadow-sm hover:border-brand-secondary/30 hover:shadow-lg transition-all group"
                   >
-                    <div className="w-full sm:w-28 h-32 sm:h-auto shrink-0 bg-[#f8f9fa] rounded-2xl flex items-center justify-center p-2 relative overflow-hidden">
-                      <div className="absolute inset-0 bg-brand-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="w-full sm:w-28 h-32 sm:h-auto shrink-0 bg-brand-background rounded-2xl flex items-center justify-center p-2 relative overflow-hidden transition-colors">
+                      <div className="absolute inset-0 bg-brand-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                       <img src={product.visualAssetUri} alt={product.culinaryNomenclature} className="w-24 h-24 sm:w-full sm:h-full object-contain filter drop-shadow-md z-10 group-hover:scale-110 transition-transform duration-300" />
                     </div>
                     
@@ -400,7 +468,7 @@ export default function DeliveryApp() {
                             <button onClick={() => addToCart(product)} className="bg-brand-primary text-brand-text p-2 sm:p-1.5 rounded-full shadow-sm hover:bg-brand-primary/90"><Plus className="w-4 h-4 font-bold" /></button>
                           </div>
                         ) : (
-                          <button onClick={() => addToCart(product)} className="w-full sm:w-auto bg-gray-100 hover:bg-brand-primary text-brand-text font-bold text-sm md:text-xs px-6 lg:px-4 py-3 lg:py-2 flex justify-center rounded-full transition-colors items-center gap-2">
+                          <button onClick={() => addToCart(product)} className="w-full sm:w-auto bg-brand-secondary/10 hover:bg-brand-secondary hover:text-white text-brand-secondary border border-brand-secondary/20 font-bold text-sm md:text-xs px-6 lg:px-4 py-3 lg:py-2 flex justify-center rounded-full transition-colors items-center gap-2">
                             <Plus className="w-4 h-4" /> Add
                           </button>
                         )}
@@ -420,11 +488,12 @@ export default function DeliveryApp() {
 
 
         {/* RIGHT COLUMN: Desktop Permanent Sidebar */}
-        <div className="hidden lg:flex w-[400px] xl:w-[450px] shrink-0 bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.02)] h-full rounded-l-3xl overflow-hidden flex-col relative z-20">
-          <div className="flex items-center px-6 py-6 border-b border-gray-100 bg-white z-10 sticky top-0">
+        <div className="hidden lg:flex w-[400px] xl:w-[450px] shrink-0 bg-brand-surface shadow-[-10px_0_30px_rgba(0,0,0,0.02)] h-full rounded-l-3xl overflow-hidden flex-col relative z-20 transition-colors">
+          <div className="flex items-center px-6 py-6 border-b border-gray-100 bg-brand-surface z-10 sticky top-0 transition-colors">
             {activeDesktopPhase !== 'CART' && activeDesktopPhase !== 'SUCCESS' && (
               <button 
                 onClick={() => {
+                  if (activeDesktopPhase === 'AUTH') setCheckoutPhase('CART');
                   if (activeDesktopPhase === 'LOCATION_FORM') setCheckoutPhase('CART');
                   if (activeDesktopPhase === 'MPESA_PAYMENT') setCheckoutPhase('LOCATION_FORM');
                 }}
@@ -435,12 +504,14 @@ export default function DeliveryApp() {
             )}
             <h3 className="w-full text-center font-black text-xl tracking-tight">
               {activeDesktopPhase === 'CART' && 'Your Basket'}
+              {activeDesktopPhase === 'AUTH' && 'Sign In'}
               {activeDesktopPhase === 'LOCATION_FORM' && 'Delivery Details'}
               {activeDesktopPhase === 'MPESA_PAYMENT' && 'Checkout Gateway'}
               {activeDesktopPhase === 'SUCCESS' && 'Verified'}
             </h3>
           </div>
           
+          <CheckoutStepper phase={activeDesktopPhase} />
           {renderCheckoutFlow(activeDesktopPhase)}
           {renderCheckoutActions(activeDesktopPhase, true)}
         </div>
@@ -456,7 +527,7 @@ export default function DeliveryApp() {
               >
                 <button 
                   onClick={() => setCheckoutPhase('CART')}
-                  className="w-full bg-brand-text text-white p-4 rounded-full shadow-2xl flex justify-between items-center transform transition-transform active:scale-95"
+                  className="w-full bg-brand-secondary text-white p-4 rounded-full shadow-2xl flex justify-between items-center transform transition-transform active:scale-95"
                 >
                   <div className="flex items-center gap-3">
                     <div className="bg-white/20 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
@@ -481,13 +552,14 @@ export default function DeliveryApp() {
                 
                 <motion.div 
                   initial={{ y: '100%' }} animate={{ y: 0, transition: { type: 'spring', damping: 25, stiffness: 200 } }} exit={{ y: '100%', transition: { type: 'spring', damping: 25, stiffness: 200 } }}
-                  className="absolute inset-x-0 bottom-0 bg-white z-40 rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden h-[90vh]"
+                  className="absolute inset-x-0 bottom-0 bg-brand-surface z-40 rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden h-[90vh] transition-colors"
                 >
                   
-                  <div className="flex items-center px-4 py-4 border-b border-gray-100 bg-white z-10 sticky top-0">
+                  <div className="flex items-center px-4 py-4 border-b border-gray-100 bg-brand-surface z-10 sticky top-0 transition-colors">
                     <button 
                       onClick={() => {
                         if (checkoutPhase === 'SUCCESS' || checkoutPhase === 'CART') { setCheckoutPhase('HIDDEN'); if(checkoutPhase === 'SUCCESS') setCartCorpus([]); } 
+                        else if (checkoutPhase === 'AUTH') setCheckoutPhase('CART');
                         else if (checkoutPhase === 'LOCATION_FORM') setCheckoutPhase('CART');
                         else if (checkoutPhase === 'MPESA_PAYMENT') setCheckoutPhase('LOCATION_FORM');
                       }}
@@ -497,12 +569,14 @@ export default function DeliveryApp() {
                     </button>
                     <h3 className="w-full text-center font-black text-lg">
                       {checkoutPhase === 'CART' && 'Your Basket'}
+                      {checkoutPhase === 'AUTH' && 'Sign In'}
                       {checkoutPhase === 'LOCATION_FORM' && 'Delivery Details'}
                       {checkoutPhase === 'MPESA_PAYMENT' && 'M-Pesa Gateway'}
                       {checkoutPhase === 'SUCCESS' && 'Confirmed'}
                     </h3>
                   </div>
 
+                  <CheckoutStepper phase={checkoutPhase} />
                   {renderCheckoutFlow(checkoutPhase)}
                   {renderCheckoutActions(checkoutPhase, false)}
                 </motion.div>

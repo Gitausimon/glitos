@@ -8,17 +8,18 @@ export default {
     extend: {
       colors: {
         brand: {
-          primary: '#FFC245',
-          secondary: '#689482',
+          primary: '#FFC533',
+          secondary: '#00A082',
+          'green-light': '#8EC042',
           accent: '#E1B648',
-          background: '#FAFAFA',
+          background: '#FFFDF8',
           surface: '#FFFFFF',
-          text: '#111827',
+          text: '#222222',
           muted: '#6B7280'
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Poppins', 'system-ui', 'sans-serif'],
       },
     },
   },

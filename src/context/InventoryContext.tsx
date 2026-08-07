@@ -1,4 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { db } from '../lib/firebase';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import type { QuerySnapshot, DocumentData } from 'firebase/firestore';
 
 export type PosInventoryItem = {
   inventoryIdentifier: string;
@@ -10,58 +13,81 @@ export type PosInventoryItem = {
   visualAssetUri: string;
 };
 
-const DEFAULT_INVENTORY: PosInventoryItem[] = [
-  { inventoryIdentifier: 'chx-01', culinaryNomenclature: 'Quarter Chicken', retailValuation: 350, deliveryValuation: 400, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/quarter_chicken.png' },
-  { inventoryIdentifier: 'chx-02', culinaryNomenclature: 'Half Chicken', retailValuation: 650, deliveryValuation: 700, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/half_chicken.png' },
-  { inventoryIdentifier: 'chp-01', culinaryNomenclature: 'Crispy Chips', retailValuation: 150, deliveryValuation: 200, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/crispy_chips.png' },
-  { inventoryIdentifier: 'bev-01', culinaryNomenclature: 'Soda 500ml', retailValuation: 100, deliveryValuation: 150, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/soda_cup.png' },
-  { inventoryIdentifier: 'cb-01', culinaryNomenclature: 'Glitos Combo', retailValuation: 450, deliveryValuation: 550, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/glitos_combo.png' },
+// We keep the defaults to seed the database if it's empty
+const DEFAULT_INVENTORY: Omit<PosInventoryItem, 'inventoryIdentifier'>[] = [
+  { culinaryNomenclature: 'Quarter Chicken', retailValuation: 350, deliveryValuation: 400, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/quarter_chicken.png' },
+  { culinaryNomenclature: 'Half Chicken', retailValuation: 650, deliveryValuation: 700, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/half_chicken.png' },
+  { culinaryNomenclature: 'Crispy Chips', retailValuation: 150, deliveryValuation: 200, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/crispy_chips.png' },
+  { culinaryNomenclature: 'Soda 500ml', retailValuation: 100, deliveryValuation: 150, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/soda_cup.png' },
+  { culinaryNomenclature: 'Glitos Combo', retailValuation: 450, deliveryValuation: 550, isAvailableForDelivery: true, stockAvailability: true, visualAssetUri: '/images/glitos_combo.png' },
 ];
 
 type InventoryContextType = {
   inventoryCorpus: PosInventoryItem[];
-  addInventoryItem: (item: Omit<PosInventoryItem, 'inventoryIdentifier'>) => void;
-  updateInventoryItem: (id: string, updates: Partial<PosInventoryItem>) => void;
-  deleteInventoryItem: (id: string) => void;
+  addInventoryItem: (item: Omit<PosInventoryItem, 'inventoryIdentifier'>) => Promise<void>;
+  updateInventoryItem: (id: string, updates: Partial<PosInventoryItem>) => Promise<void>;
+  deleteInventoryItem: (id: string) => Promise<void>;
+  loading: boolean;
 };
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 export function InventoryProvider({ children }: { children: ReactNode }) {
-  const [inventoryCorpus, setInventoryCorpus] = useState<PosInventoryItem[]>(() => {
-    const cached = localStorage.getItem('glitos-inventory-layer');
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch (e) {
-        return DEFAULT_INVENTORY;
-      }
-    }
-    return DEFAULT_INVENTORY;
-  });
+  const [inventoryCorpus, setInventoryCorpus] = useState<PosInventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Sync to localStorage
   useEffect(() => {
-    localStorage.setItem('glitos-inventory-layer', JSON.stringify(inventoryCorpus));
-  }, [inventoryCorpus]);
+    const inventoryCol = collection(db, 'inventory');
+    let hasSeeded = false;
 
-  const addInventoryItem = (item: Omit<PosInventoryItem, 'inventoryIdentifier'>) => {
-    const newItem = {
-      ...item,
-      // Immutable token generator for mock database
-      inventoryIdentifier: `gen-${Math.random().toString(36).substring(2, 9)}`
-    };
-    setInventoryCorpus(prev => [...prev, newItem]);
+    const unsubscribe = onSnapshot(inventoryCol, (snapshot: QuerySnapshot<DocumentData>) => {
+      if (snapshot.empty && !hasSeeded) {
+        // Automatically seed with default inventory on first empty load
+        hasSeeded = true;
+        DEFAULT_INVENTORY.forEach((item) => {
+          addDoc(inventoryCol, item).catch(console.error);
+        });
+      } else {
+        const items = snapshot.docs.map(doc => ({
+          inventoryIdentifier: doc.id,
+          ...doc.data()
+        })) as PosInventoryItem[];
+        setInventoryCorpus(items);
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching inventory:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const addInventoryItem = async (item: Omit<PosInventoryItem, 'inventoryIdentifier'>) => {
+    try {
+      const inventoryCol = collection(db, 'inventory');
+      await addDoc(inventoryCol, item);
+    } catch (e) {
+      console.error("Error adding inventory item:", e);
+    }
   };
 
-  const updateInventoryItem = (id: string, updates: Partial<PosInventoryItem>) => {
-    setInventoryCorpus(prev => 
-      prev.map(item => item.inventoryIdentifier === id ? { ...item, ...updates } : item)
-    );
+  const updateInventoryItem = async (id: string, updates: Partial<PosInventoryItem>) => {
+    try {
+      const docRef = doc(db, 'inventory', id);
+      await updateDoc(docRef, updates);
+    } catch (e) {
+      console.error("Error updating inventory item:", e);
+    }
   };
 
-  const deleteInventoryItem = (id: string) => {
-    setInventoryCorpus(prev => prev.filter(item => item.inventoryIdentifier !== id));
+  const deleteInventoryItem = async (id: string) => {
+    try {
+      const docRef = doc(db, 'inventory', id);
+      await deleteDoc(docRef);
+    } catch (e) {
+      console.error("Error deleting inventory item:", e);
+    }
   };
 
   return (
@@ -69,7 +95,8 @@ export function InventoryProvider({ children }: { children: ReactNode }) {
       inventoryCorpus,
       addInventoryItem,
       updateInventoryItem,
-      deleteInventoryItem
+      deleteInventoryItem,
+      loading
     }}>
       {children}
     </InventoryContext.Provider>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glitos Logo Animation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #FFFDF7; /* Premium warm background */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        /* Ambient light effects */
+        .ambient-light {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.6;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .light-1 {
+            width: 500px;
+            height: 500px;
+            background: rgba(248, 166, 4, 0.15); /* Orange-gold glow */
+            top: -100px;
+            left: -100px;
+        }
+
+        .light-2 {
+            width: 600px;
+            height: 600px;
+            background: rgba(151, 20, 22, 0.1); /* Dark red glow */
+            bottom: -200px;
+            right: -100px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            height: 100%;
+            max-height: 600px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        svg {
+            width: 100%;
+            height: auto;
+            visibility: hidden; /* Hide until we run GSAP */
+            filter: drop-shadow(0px 20px 40px rgba(0,0,0,0.15));
+        }
+
+        /* Tagline Text */
+        .tagline {
+            position: absolute;
+            bottom: 15%;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1F1E1E;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0;
+            z-index: 10;
+        }
+
+        .tagline span {
+            color: #F8A604;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="ambient-light light-1"></div>
+    <div class="ambient-light light-2"></div>
+    
+    <div class="container" id="svg-container">
+        <!-- SVG injected securely via fetch -->
+    </div>
+
+    <div class="tagline" id="tagline">Glitos <span>Restaurant</span></div>
+
+    <!-- GSAP for powerful animation engineering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+        async function fetchAndAnimate() {
+            try {
+                // Fetch the original local SVG
+                const response = await fetch('glitoslogo.svg');
+                if (!response.ok) throw new Error("Could not find glitoslogo.svg in the directory");
+                
+                const svgText = await response.text();
+                
+                const container = document.getElementById('svg-container');
+                container.innerHTML = svgText;
+                
+                const svg = container.querySelector('svg');
+                // Allow overflow if parts scatter outside
+                svg.style.overflow = "visible";
+                svg.style.visibility = 'visible';
+
+                // Locate all geometric paths dynamically
+                const paths = svg.querySelectorAll('path');
+                
+                // Start by scaling/randomizing the pieces
+                gsap.set(paths, {
+                    transformOrigin: "50% 50%",
+                    opacity: 0,
+                    scale: 0.2,
+                    rotation: () => gsap.utils.random(-180, 180),
+                    // Spread pieces outwards dynamically
+                    x: () => gsap.utils.random(-400, 400),
+                    y: () => gsap.utils.random(-300, 300),
+                });
+
+                // Timeline ensures sequence
+                const tl = gsap.timeline({ defaults: { ease: "power4.out" } });
+
+                // Scatter Assemble Animation
+                tl.to(paths, {
+                    duration: 2.5,
+                    opacity: 1,
+                    scale: 1,
+                    rotation: 0,
+                    x: 0,
+                    y: 0,
+                    stagger: {
+                        amount: 1.8,
+                        from: "center", // Draws from center out or random depends on SVG layout
+                        grid: "auto"
+                    }
+                })
+                .to("#tagline", {
+                    duration: 1.5,
+                    opacity: 1,
+                    y: -20,
+                    ease: "expo.out"
+                }, "-=1.5"); // Start slightly before pieces finish locking in
+
+                // Overarching infinite 3D-like float effect after assemble
+                gsap.to(svg, {
+                    y: "-=20",
+                    rotationX: 2,
+                    rotationY: -2,
+                    duration: 4,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: "sine.inOut"
+                });
+
+                // Soft micro-interactions on pieces
+                paths.forEach(path => {
+                    path.addEventListener('mouseenter', () => {
+                        gsap.to(path, { scale: 1.08, duration: 0.4, ease: "back.out(2)" });
+                    });
+                    path.addEventListener('mouseleave', () => {
+                        gsap.to(path, { scale: 1, duration: 0.4, ease: "back.out(2)" });
+                    });
+                });
+
+            } catch (error) {
+                console.error("Failed to load or animate SVG:", error);
+                document.getElementById('svg-container').innerHTML = `<p style="color:red;font-weight:bold;">Error: missing glitoslogo.svg or failed to fetch.</p>`;
+            }
+        }
+
+        window.onload = fetchAndAnimate;
+    </script>
+</body>
+</html>
