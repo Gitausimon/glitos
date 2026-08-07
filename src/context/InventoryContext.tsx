@@ -11,6 +11,7 @@ export type PosInventoryItem = {
   isAvailableForDelivery: boolean;
   stockAvailability: boolean;
   visualAssetUri: string;
+  productCategory?: string;
 };
 
 // We keep the defaults to seed the database if it's empty

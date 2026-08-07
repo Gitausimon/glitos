@@ -72,7 +72,8 @@ export default function AdminDashboard() {
     retailValuation: 0,
     deliveryValuation: 0,
     isAvailableForDelivery: true,
-    visualAssetUri: '/images/quarter_chicken.png'
+    visualAssetUri: '/images/quarter_chicken.png',
+    productCategory: 'Chicken'
   });
 
   const renderHealthIndicator = (percent: number, max: number) => {
@@ -97,7 +98,8 @@ export default function AdminDashboard() {
         retailValuation: product.retailValuation,
         deliveryValuation: product.deliveryValuation ?? product.retailValuation,
         isAvailableForDelivery: product.isAvailableForDelivery ?? true,
-        visualAssetUri: product.visualAssetUri
+        visualAssetUri: product.visualAssetUri,
+        productCategory: product.productCategory || 'Chicken'
       });
     } else {
       setActiveEditingRef(null);
@@ -106,7 +108,8 @@ export default function AdminDashboard() {
         retailValuation: 0,
         deliveryValuation: 0,
         isAvailableForDelivery: activeViewFocus === 'DELIVERY_MENU',
-        visualAssetUri: '/images/quarter_chicken.png' // default asset
+        visualAssetUri: '/images/quarter_chicken.png', // default asset
+        productCategory: 'Chicken'
       });
     }
     setIsProductModalActive(true);
@@ -121,7 +124,8 @@ export default function AdminDashboard() {
         retailValuation: draftProduct.retailValuation,
         deliveryValuation: draftProduct.deliveryValuation,
         isAvailableForDelivery: draftProduct.isAvailableForDelivery,
-        visualAssetUri: draftProduct.visualAssetUri
+        visualAssetUri: draftProduct.visualAssetUri,
+        productCategory: draftProduct.productCategory
       });
     } else {
       addInventoryItem({
@@ -130,7 +134,8 @@ export default function AdminDashboard() {
         deliveryValuation: draftProduct.deliveryValuation || draftProduct.retailValuation,
         isAvailableForDelivery: draftProduct.isAvailableForDelivery,
         visualAssetUri: draftProduct.visualAssetUri,
-        stockAvailability: true
+        stockAvailability: true,
+        productCategory: draftProduct.productCategory
       });
     }
     setIsProductModalActive(false);
@@ -204,7 +209,7 @@ export default function AdminDashboard() {
           className={`flex items-center gap-3 px-4 py-2.5 squircle-g2-sm transition-all whitespace-nowrap ${activeViewFocus === 'PRODUCTS' ? 'bg-brand-secondary text-white' : 'hover:bg-gray-100'}`}
         >
           <Store className="w-4 h-4" />
-          <span className="font-semibold text-sm">Shared Catalog</span>
+          <span className="font-semibold text-sm">POS Edit</span>
         </button>
         
         <button 
@@ -616,7 +621,7 @@ export default function AdminDashboard() {
                       <AnimatePresence>
                         {inventoryCorpus.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="text-center py-10 font-bold text-gray-400">Catalog is fully depleted. Add a product in Shared Catalog.</td>
+                            <td colSpan={5} className="text-center py-10 font-bold text-gray-400">Catalog is fully depleted. Add a product in POS Edit.</td>
                           </tr>
                         ) : inventoryCorpus.map((product) => (
                           <motion.tr 
@@ -849,6 +854,20 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-3 bg-gray-50 border border-brand-primary/20 squircle-g2-sm outline-none focus:border-brand-primary font-medium"
                     placeholder="0"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Category</label>
+                  <select 
+                    value={draftProduct.productCategory || 'Chicken'}
+                    onChange={(e) => setDraftProduct({ ...draftProduct, productCategory: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 squircle-g2-sm outline-none focus:border-black font-medium"
+                  >
+                    <option value="Breakfast\n& Snacks">Breakfast & Snacks</option>
+                    <option value="Chicken">Chicken</option>
+                    <option value="Chips & Sides">Chips & Sides</option>
+                    <option value="Drinks">Drinks</option>
+                    <option value="Packaging">Packaging</option>
+                  </select>
                 </div>
                 <div className="flex items-center justify-between py-2 border-t border-gray-100 mt-2 pt-4">
                   <label className="text-sm font-bold text-gray-700">Available on G Delivery App</label>

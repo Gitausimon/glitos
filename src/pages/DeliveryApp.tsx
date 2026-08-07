@@ -51,12 +51,15 @@ export default function DeliveryApp() {
     return inventoryCorpus
       .filter(item => item.isAvailableForDelivery !== false)
       .map(item => {
-        let category = 'Breakfast & Snacks'; // Default
-        const name = (item.culinaryNomenclature || '').toLowerCase();
-        if (name.includes('chicken') || name.includes('combo') || name.includes('burger')) category = 'Chicken';
-        if (name.includes('chips') || name.includes('fries') || name.includes('potato')) category = 'Chips & Sides';
-        if (name.includes('soda') || name.includes('drink') || name.includes('water') || name.includes('coke')) category = 'Drinks';
-        if (name.includes('bag') || name.includes('package') || name.includes('box')) category = 'Packaging';
+        let category = item.productCategory;
+        if (!category) {
+          category = 'Breakfast & Snacks'; // Default
+          const name = (item.culinaryNomenclature || '').toLowerCase();
+          if (name.includes('chicken') || name.includes('combo') || name.includes('burger')) category = 'Chicken';
+          if (name.includes('chips') || name.includes('fries') || name.includes('potato')) category = 'Chips & Sides';
+          if (name.includes('soda') || name.includes('drink') || name.includes('water') || name.includes('coke')) category = 'Drinks';
+          if (name.includes('bag') || name.includes('package') || name.includes('box')) category = 'Packaging';
+        }
         return { ...item, category, currentPrice: item.deliveryValuation ?? item.retailValuation };
       });
   }, [inventoryCorpus]);
